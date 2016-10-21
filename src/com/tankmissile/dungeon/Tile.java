@@ -7,6 +7,13 @@ public class Tile {
 	
 	protected int type = UNUSED;
 	
+	protected final int x, y;
+	
+	public Tile(int x, int y){
+		this.x=x;
+		this.y=y;
+	}
+	
 	public int getType(){
 		return type;
 	}

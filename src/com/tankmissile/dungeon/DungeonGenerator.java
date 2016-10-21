@@ -19,7 +19,7 @@ public class DungeonGenerator {
 	Tile[][] map;
 	Vector<Room> rooms;
 	Vector<Room> deadEnds;
-	Vector<Room> doors;
+	Vector<Door> doors;
 
 	public DungeonGenerator(int w, int h){
 		MAP_WIDTH = w;
@@ -28,13 +28,13 @@ public class DungeonGenerator {
 
 		rooms = new Vector<Room>();
 		deadEnds = new Vector<Room>();
-		doors = new Vector<Room>();
+		doors = new Vector<Door>();
 
 		//initialize map
 		map = new Tile[w][h];
 		for(int j = 0; j < MAP_HEIGHT; j++){
 			for(int i = 0; i < MAP_WIDTH; i++){
-				map[i][j] = new Tile();
+				map[i][j] = new Tile(i,j);
 			}
 		}
 
@@ -145,21 +145,20 @@ public class DungeonGenerator {
 			return 0;
 		}
 
-		//TODO get list of possible doors and add a random one
-		Vector<Room> possibleDoors = new Vector<Room>();
+		Vector<Door> possibleDoors = new Vector<Door>();
 
 		//vertical
 		if(y+vdir > 1 && y+vdir < MAP_HEIGHT-1){ //make sure it doesn't go out of bounds
 			for( ; x < c.x + c.w; x++){
 				if(!canPlaceDoor(x, y, side, vdir)) continue;
-				possibleDoors.add(new Room(x,y,1,1));
+				possibleDoors.add(new Door(x,y, (vdir == -1) ? Tile.NORTH : Tile.SOUTH));
 			}
 		}
 		//horizontal
 		else if(x+hdir > 1 && x+hdir < MAP_WIDTH-1){ //make sure it doesn't go out of bounds
 			for( ; y < c.y + c.h; y++){
 				if(!canPlaceDoor(x, y, side, hdir)) continue;
-				possibleDoors.add(new Room(x,y,1,1));
+				possibleDoors.add(new Door(x,y, hdir == -1 ? Tile.WEST : Tile.EAST));
 			}
 		}
 
@@ -172,7 +171,7 @@ public class DungeonGenerator {
 		int numPlaced = 0;
 		while(numPlaced < numDoorsToPlace && possibleDoors.size() > 0){
 			where = (int)Math.floor(Math.random() * possibleDoors.size());
-			Room newDoor = possibleDoors.elementAt(where);
+			Door newDoor = possibleDoors.elementAt(where);
 			
 			//make sure we haven't made a door invalid
 			if(!canPlaceDoor(newDoor.x, newDoor.y, side, (side == Tile.EAST || side == Tile.WEST) ? hdir : vdir)){
@@ -180,7 +179,7 @@ public class DungeonGenerator {
 				continue;
 			}
 			
-			map[newDoor.x][newDoor.y].type = Tile.DOOR;
+			map[newDoor.x][newDoor.y] = newDoor;
 			numPlaced++;
 			possibleDoors.remove(newDoor);
 		}
@@ -216,7 +215,7 @@ public class DungeonGenerator {
 
 	//iterate over each door, find a path to another door or intersection and attempt to straighten it
 	void straightenHalls(){
-		for(Room r : doors){
+		for(Door d : doors){
 			
 		}
 	}
@@ -484,16 +483,37 @@ public class DungeonGenerator {
 
 }
 
-class Room {
-	int x;
-	int y;
-	int w;
-	int h;
+class Door extends Tile {
+	int dir; //direction of hall (use Tile.NORTH /etc)
+	
+	public Door(int x, int y, int direction){
+		super(x, y);
+		dir = direction;
+		type = Tile.DOOR;
+	}
+	
+	public int getDir(){
+		return dir;
+	}
+	public void setDir(int d){
+		dir = d;
+	}
+}
+
+//The tile it extends is the origin, this also stores a width and height (tiles within range are not stored) //TODO maybe I should store them?
+class Room extends Tile{
+	protected final int w, h;
 
 	public Room(int a, int b, int c, int d){
-		x = a;
-		y = b;
+		super(a,b);
 		w = c;
 		h = d;
+	}
+	
+	public int getWidth(){
+		return w;
+	}
+	public int getHeight(){
+		return h;
 	}
 }
