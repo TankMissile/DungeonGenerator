@@ -149,23 +149,17 @@ public class DungeonGenerator {
 		Vector<Room> possibleDoors = new Vector<Room>();
 
 		//vertical
-		if(side == Tile.NORTH && y > 2 || side == Tile.SOUTH && y < MAP_HEIGHT - 2){ //make sure it doesn't go out of bounds
+		if(y+vdir > 1 && y+vdir < MAP_HEIGHT-1){ //make sure it doesn't go out of bounds
 			for( ; x < c.x + c.w; x++){
 				if(!canPlaceDoor(x, y, side, vdir)) continue;
 				possibleDoors.add(new Room(x,y,1,1));
-
-				//if(map[x][y+vdir].type == Tile.HALL || map[x][y+vdir].type == Tile.ROOM){
-				//}
 			}
 		}
 		//horizontal
-		else if(side == Tile.WEST && x > 2 || side == Tile.EAST && x < MAP_WIDTH - 2){ //make sure it doesn't go out of bounds
+		else if(x+hdir > 1 && x+hdir < MAP_WIDTH-1){ //make sure it doesn't go out of bounds
 			for( ; y < c.y + c.h; y++){
 				if(!canPlaceDoor(x, y, side, hdir)) continue;
 				possibleDoors.add(new Room(x,y,1,1));
-
-				//if(map[x+hdir][y].type == Tile.HALL || map[x+hdir][y].type == Tile.ROOM){
-				//}
 			}
 		}
 
@@ -179,6 +173,13 @@ public class DungeonGenerator {
 		while(numPlaced < numDoorsToPlace && possibleDoors.size() > 0){
 			where = (int)Math.floor(Math.random() * possibleDoors.size());
 			Room newDoor = possibleDoors.elementAt(where);
+			
+			//make sure we haven't made a door invalid
+			if(!canPlaceDoor(newDoor.x, newDoor.y, side, (side == Tile.EAST || side == Tile.WEST) ? hdir : vdir)){
+				possibleDoors.remove(newDoor);
+				continue;
+			}
+			
 			map[newDoor.x][newDoor.y].type = Tile.DOOR;
 			numPlaced++;
 			possibleDoors.remove(newDoor);
@@ -216,7 +217,7 @@ public class DungeonGenerator {
 	//iterate over each door, find a path to another door or intersection and attempt to straighten it
 	void straightenHalls(){
 		for(Room r : doors){
-			crawlPathForIntersection(r.x, r.y);
+			
 		}
 	}
 
@@ -238,81 +239,6 @@ public class DungeonGenerator {
 				if(j < MAP_HEIGHT-1 && (map[i][j+1].type == Tile.HALL || map[i][j+1].type == Tile.ROOM || map[i][j+1].type == Tile.DOOR)) continue;
 
 				map[i][j].type = Tile.UNUSED;
-			}
-		}
-	}
-
-	void crawlPathForIntersection(int x, int y){
-		int oldx = x, oldy = y;
-		//find which direction to start
-		if(y > 0 && map[x][y-1].type == Tile.HALL) {
-			y = y-1;
-		}
-		else if(y < MAP_HEIGHT -1 &&  map[x][y+1].type == Tile.HALL) {
-			y = y+1;
-		}
-		else if(x > 0 && map[x-1][y].type == Tile.HALL) {
-			x = x-1;
-		}
-		else if(x < MAP_WIDTH-1 && map[x+1][y].type == Tile.HALL) {
-			x = x+1;
-		}
-
-		//store this tile as the starting point for the straighten
-		int startx = x, starty = y;
-
-		//crawl along until an intersection or door is found
-		while(!isIntersection(x, y)){
-			if(x-1 >= 0 && x-1 != oldx && map[x-1][y].type == Tile.HALL || map[x-1][y].type == Tile.DOOR){
-				oldx=x;
-				x = x-1;
-			}
-			else if(x+1 < MAP_WIDTH && x+1 != x && map[x+1][y].type == Tile.HALL || map[x+1][y].type == Tile.DOOR){
-				oldx=x;
-				x = x+1;
-			}
-			else if(y-1 > 0 && y-1 != oldy && map[x][y-1].type == Tile.HALL ||  map[x][y-1].type == Tile.DOOR){
-				oldy = y;
-				y = y-1;
-			}
-			else if(y+1 < MAP_HEIGHT && y+1 != oldy && map[x][y+1].type == Tile.HALL ||  map[x][y+1].type == Tile.DOOR){
-				oldy = y;
-				y = y+1;
-			}
-		}
-
-		//attempt to find a straighter line between them
-		straighten(startx, starty, x, y);
-
-		//clear out the dead ends created
-	}
-
-	void straighten(int x, int y, int targx, int targy){
-		if(targx == x && targy == y) return;
-
-		if(targx > x){
-			if(targy > y){ //down and to the right
-				//try horizontal first
-				if(map[x+1][y].type != Tile.WALL){
-					setHall(x+1,y);
-					straighten(x+1, y, targx, targy);
-				}
-				//if not do vertical first
-				else if(map[x][y+1].type != Tile.WALL){
-					setHall(x,y+1);
-					straighten(x,y+1,targx,targy);
-				}
-			}
-			else if(targy <= y){ //up and to the right
-
-			}
-		}
-		else if(targx <= x){
-			if(targy > y){ //down and to the left
-
-			}
-			else if(targy <= y){ //up and to the left
-
 			}
 		}
 	}
@@ -512,7 +438,7 @@ public class DungeonGenerator {
 			return false;
 		}
 
-		//check that there's no overlap
+		//check that there's no overlap, if disabled
 		if(!allowRoomOverlap){
 			for(int j = y; j < y+h; j++){
 				for(int i = x; i < x+w; i++){
