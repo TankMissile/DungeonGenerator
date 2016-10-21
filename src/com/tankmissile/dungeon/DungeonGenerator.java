@@ -1,23 +1,22 @@
 package com.tankmissile.dungeon;
 
+import java.util.Random;
 import java.util.Vector;
 
 public class DungeonGenerator {
-	
+
 	final int MAP_WIDTH, MAP_HEIGHT;
 	final int ROOM_MAXW = 6, ROOM_MAXH = 6;
 	final int ROOM_MINW = 3, ROOM_MINH = 3;
 
 	final int CORNER_WEIGHT = 5; //percent chance of generating a hallway intersection/corner
 	final int ROOM_ATTEMPTS; //number of tries to create rooms - NOT the number of rooms in final maze!
-	final int MAX_DOORS_PER_ROOM = 2;
+	final int MAX_DOORS_PER_ROOM = 4;
 	final int DOOR_WEIGHT = 25;//percent chance of generating a door at any given point
 
 	final boolean allowRoomOverlap = false;
 
-	public enum tileType { UNUSED, WALL, HALL, HWALL, ROOM, DOOR }; //HWALL is a hallway wall; not used for generating doors but otherwise functions the same
-
-	tileType[][] map;
+	Tile[][] map;
 	Vector<Room> rooms;
 	Vector<Room> deadEnds;
 	Vector<Room> doors;
@@ -32,33 +31,33 @@ public class DungeonGenerator {
 		doors = new Vector<Room>();
 
 		//initialize map
-		map = new tileType[w][h];
+		map = new Tile[w][h];
 		for(int j = 0; j < MAP_HEIGHT; j++){
 			for(int i = 0; i < MAP_WIDTH; i++){
-				map[i][j] = tileType.UNUSED;
+				map[i][j] = new Tile();
 			}
 		}
 
 		//place rooms
 		placeRooms();
-		System.out.println("\nPlaced Rooms...");
-		debugPrintMap();
+		//System.out.println("\nPlaced Rooms...");
+		//debugPrintMap();
 
 		//fill halls
 		placeHalls();
-		System.out.println("\nPlaced Halls...");
-		debugPrintMap();
+		//System.out.println("\nPlaced Halls...");
+		//debugPrintMap();
 
 		//connect everything
 		placeDoors();
-		System.out.println("\nPlaced Doors...");
-		debugPrintMap();
+		//System.out.println("\nPlaced Doors...");
+		//debugPrintMap();
 
 		//remove dead ends
 		removeDeadEnds();
-		System.out.println("\nRemoved Dead Ends...");
-		debugPrintMap();
-		
+		//System.out.println("\nRemoved Dead Ends...");
+		//debugPrintMap();
+
 		//make the halls less jagged
 		//straightenHalls();
 		//System.out.println("\nStraightened Halls...");
@@ -66,7 +65,7 @@ public class DungeonGenerator {
 
 		//remove extra walls
 		removeExtraWalls();
-		System.out.println("\nRemoved Extra Walls...");
+		//System.out.println("\nRemoved Extra Walls...");
 		//debugPrintMap();
 	}
 
@@ -91,7 +90,7 @@ public class DungeonGenerator {
 	void placeHalls(){
 		for(int i = 1; i < MAP_WIDTH-1; i++){
 			for(int j = 1; j < MAP_HEIGHT-1; j++){
-				if(map[i][j] == tileType.UNUSED){
+				if(map[i][j].type == Tile.UNUSED){
 					generateHallJagged(i,j);
 					deadEnds.add(new Room(i,j,1,1));
 				}
@@ -102,85 +101,110 @@ public class DungeonGenerator {
 	//puts at least one door connected to a hallway in every room
 	void placeDoors(){
 		for(Room c : rooms){
-			
+
 			int numDoors = 0;
 
+			//try east edge
+			if(numDoors < MAX_DOORS_PER_ROOM) numDoors += tryPlaceDoors(c, Tile.EAST, 1);
+
 			//try north edge
-			if(c.y > 2){
-				for(int i = c.x; i < c.x + c.w; i++){
-					if(map[i][c.y-1] == tileType.ROOM) continue;
-					
-					if(map[i][c.y-2] == tileType.HALL || map[i][c.y-2] == tileType.ROOM){
-						if(numDoors < MAX_DOORS_PER_ROOM) {
-							map[i][c.y-1] = tileType.DOOR;
-							doors.add(new Room(i,c.y-1,1,1));
-							numDoors++;
-							break;
-						}
-						else {
-							break;
-						}
-					}
-				}
-			}
+			if(numDoors < MAX_DOORS_PER_ROOM) numDoors += tryPlaceDoors(c, Tile.NORTH, 1);
 
 			//try south edge
-			if(c.y + c.w < MAP_HEIGHT - 2){
-				for(int i = c.x; i < c.x + c.w; i++){
-					if(map[i][c.y+c.h] == tileType.ROOM) continue;
-					
-					if(map[i][c.y+c.h+1] == tileType.HALL || map[i][c.y+c.h+1] == tileType.ROOM){
-						if(numDoors < MAX_DOORS_PER_ROOM) {
-							map[i][c.y+c.h] = tileType.DOOR;
-							doors.add(new Room(i,c.y+c.h,1,1));
-							numDoors++;
-							break;
-						}
-						else {
-							break;
-						}
-					}
-				}
-			}
+			if(numDoors < MAX_DOORS_PER_ROOM) numDoors += tryPlaceDoors(c, Tile.SOUTH, 1);
 
 			//try west edge
-			if(c.x > 2){
-				for(int j = c.y; j < c.y + c.h; j++){
-					if(map[c.x-1][j] == tileType.ROOM) continue;
-					
-					if(map[c.x-2][j] == tileType.HALL || map[c.x-2][j] == tileType.ROOM){
-						if(numDoors < MAX_DOORS_PER_ROOM) {
-							map[c.x-1][j] = tileType.DOOR;
-							doors.add(new Room(c.x-1,j,1,1));
-							numDoors++;
-							break;
-						}
-						else {
-							break;
-						}
-					}
-				}
-			}
+			if(numDoors < MAX_DOORS_PER_ROOM) numDoors += tryPlaceDoors(c, Tile.WEST, 1);
+		}
+	}
 
-			//try east edge
-			if(c.x + c.y < MAP_WIDTH - 2){
-				for(int j = c.y; j < c.y + c.h; j++){
-					if(map[c.x+c.w][j] == tileType.ROOM) continue;
-					
-					if(map[c.x+c.w+1][j] == tileType.HALL || map[c.x+c.w+1][j] == tileType.ROOM){
-						if(numDoors < MAX_DOORS_PER_ROOM) {
-							map[c.x+c.w][j] = tileType.DOOR;
-							doors.add(new Room(c.x+c.w,j,1,1));
-							numDoors++;
-							break;
-						}
-						else {
-							break;
-						}
-					}
-				}
+	//tries to place a door along Room c's wall as specified by side.  Returns true if a door was placed
+	int tryPlaceDoors(Room c, int side, int numDoorsToPlace){
+		if(numDoorsToPlace == 0) return 0;
+		
+		int x = c.x, y = c.y, hdir = 0, vdir = 0;
+
+		switch(side){
+		case Tile.NORTH:
+			y = c.y-1;
+			vdir = -1;
+			break;
+		case Tile.SOUTH:
+			y = c.y+c.h;
+			vdir = 1;
+			break;
+		case Tile.WEST:
+			x = c.x-1;
+			hdir = -1;
+			break;
+		case Tile.EAST:
+			x = c.x+c.w;
+			hdir = 1;
+			break;
+		default:
+			return 0;
+		}
+
+		//TODO get list of possible doors and add a random one
+		Vector<Room> possibleDoors = new Vector<Room>();
+
+		//vertical
+		if(side == Tile.NORTH && y > 2 || side == Tile.SOUTH && y < MAP_HEIGHT - 2){ //make sure it doesn't go out of bounds
+			for( ; x < c.x + c.w; x++){
+				if(!canPlaceDoor(x, y, side, vdir)) continue;
+				possibleDoors.add(new Room(x,y,1,1));
+
+				//if(map[x][y+vdir].type == Tile.HALL || map[x][y+vdir].type == Tile.ROOM){
+				//}
 			}
 		}
+		//horizontal
+		else if(side == Tile.WEST && x > 2 || side == Tile.EAST && x < MAP_WIDTH - 2){ //make sure it doesn't go out of bounds
+			for( ; y < c.y + c.h; y++){
+				if(!canPlaceDoor(x, y, side, hdir)) continue;
+				possibleDoors.add(new Room(x,y,1,1));
+
+				//if(map[x+hdir][y].type == Tile.HALL || map[x+hdir][y].type == Tile.ROOM){
+				//}
+			}
+		}
+
+		if(possibleDoors.size() == 0){
+			return 0;
+		}
+
+		//actually add doors
+		int where;
+		int numPlaced = 0;
+		while(numPlaced < numDoorsToPlace && possibleDoors.size() > 0){
+			where = (int)Math.floor(Math.random() * possibleDoors.size());
+			Room newDoor = possibleDoors.elementAt(where);
+			map[newDoor.x][newDoor.y].type = Tile.DOOR;
+			numPlaced++;
+			possibleDoors.remove(newDoor);
+		}
+
+		return numPlaced;
+	}
+
+	boolean canPlaceDoor(int x, int y, int side, int dir){
+		//make sure the door isn't being placed in the middle of a room or sideways next to a door/hallway
+		if(side == Tile.EAST || side == Tile.WEST){
+			if(map[x][y].type == Tile.ROOM || map[x][y].type == Tile.DOOR) return false;
+			if( y-1 > 0 && (map[x][y-1].type == Tile.ROOM || map[x][y-1].type == Tile.DOOR)) return false;
+			if( y+1 < MAP_HEIGHT && (map[x][y+1].type == Tile.ROOM || map[x][y+1].type == Tile.DOOR)) return false;
+			
+			if(map[x+dir][y].type == Tile.HALL || map[x+dir][y].type == Tile.ROOM) return true;
+		}
+		else {
+			if(map[x][y].type == Tile.ROOM || map[x][y].type == Tile.DOOR) return false; //don't place a door on a room or door tile, silly!
+			if( x-1 > 0 && (map[x-1][y].type == Tile.ROOM || map[x-1][y].type == Tile.DOOR || map[x-1][y].type == Tile.HALL)) return false; //don't place a door next to a room, hall or door tile, silly!
+			if( x+1 < MAP_WIDTH && (map[x+1][y].type == Tile.ROOM || map[x+1][y].type == Tile.DOOR || map[x+1][y].type == Tile.HALL)) return false;
+			
+			if(map[x][y+dir].type == Tile.HALL || map[x][y+dir].type == Tile.ROOM) return true;
+		}
+
+		return false;
 	}
 
 	void removeDeadEnds(){
@@ -195,25 +219,25 @@ public class DungeonGenerator {
 			crawlPathForIntersection(r.x, r.y);
 		}
 	}
-	
+
 	void removeExtraWalls(){
 		for(int i = 0; i < MAP_WIDTH; i++){
 			for(int j = 0; j < MAP_HEIGHT; j++){
 				//check all sides to see if one is a hall/room/door, if so skip
 				if(i > 0){
-					if(map[i-1][j] == tileType.HALL || map[i-1][j] == tileType.ROOM || map[i-1][j] == tileType.DOOR) continue;
-					if(j > 0 && (map[i-1][j-1] == tileType.HALL || map[i-1][j] == tileType.ROOM || map[i-1][j] == tileType.DOOR)) continue;
-					if(j < MAP_HEIGHT-1 && (map[i-1][j] == tileType.HALL || map[i-1][j] == tileType.ROOM)) continue;
+					if(map[i-1][j].type == Tile.HALL || map[i-1][j].type == Tile.ROOM || map[i-1][j].type == Tile.DOOR) continue;
+					if(j > 0 && (map[i-1][j-1].type == Tile.HALL || map[i-1][j].type == Tile.ROOM || map[i-1][j].type == Tile.DOOR)) continue;
+					if(j < MAP_HEIGHT-1 && (map[i-1][j].type == Tile.HALL || map[i-1][j].type == Tile.ROOM)) continue;
 				}
 				if(i < MAP_WIDTH -1){
-					if(map[i+1][j] == tileType.HALL || map[i+1][j] == tileType.ROOM || map[i+1][j] == tileType.DOOR) continue;
-					if(j > 0 && (map[i+1][j-1] == tileType.HALL || map[i+1][j] == tileType.ROOM || map[i+1][j] == tileType.DOOR)) continue;
-					if(j < MAP_HEIGHT-1 && (map[i+1][j] == tileType.HALL || map[i+1][j] == tileType.ROOM || map[i+1][j] == tileType.DOOR)) continue;
+					if(map[i+1][j].type == Tile.HALL || map[i+1][j].type == Tile.ROOM || map[i+1][j].type == Tile.DOOR) continue;
+					if(j > 0 && (map[i+1][j-1].type == Tile.HALL || map[i+1][j].type == Tile.ROOM || map[i+1][j].type == Tile.DOOR)) continue;
+					if(j < MAP_HEIGHT-1 && (map[i+1][j].type == Tile.HALL || map[i+1][j].type == Tile.ROOM || map[i+1][j].type == Tile.DOOR)) continue;
 				}
-				if(j > 0 && (map[i][j-1] == tileType.HALL || map[i][j-1] == tileType.ROOM || map[i][j-1] == tileType.DOOR)) continue;
-				if(j < MAP_HEIGHT-1 && (map[i][j+1] == tileType.HALL || map[i][j+1] == tileType.ROOM || map[i][j+1] == tileType.DOOR)) continue;
-				
-				map[i][j] = tileType.UNUSED;
+				if(j > 0 && (map[i][j-1].type == Tile.HALL || map[i][j-1].type == Tile.ROOM || map[i][j-1].type == Tile.DOOR)) continue;
+				if(j < MAP_HEIGHT-1 && (map[i][j+1].type == Tile.HALL || map[i][j+1].type == Tile.ROOM || map[i][j+1].type == Tile.DOOR)) continue;
+
+				map[i][j].type = Tile.UNUSED;
 			}
 		}
 	}
@@ -221,119 +245,119 @@ public class DungeonGenerator {
 	void crawlPathForIntersection(int x, int y){
 		int oldx = x, oldy = y;
 		//find which direction to start
-		if(y > 0 && map[x][y-1] == tileType.HALL) {
+		if(y > 0 && map[x][y-1].type == Tile.HALL) {
 			y = y-1;
 		}
-		else if(y < MAP_HEIGHT -1 &&  map[x][y+1] == tileType.HALL) {
+		else if(y < MAP_HEIGHT -1 &&  map[x][y+1].type == Tile.HALL) {
 			y = y+1;
 		}
-		else if(x > 0 && map[x-1][y] == tileType.HALL) {
+		else if(x > 0 && map[x-1][y].type == Tile.HALL) {
 			x = x-1;
 		}
-		else if(x < MAP_WIDTH-1 && map[x+1][y] == tileType.HALL) {
+		else if(x < MAP_WIDTH-1 && map[x+1][y].type == Tile.HALL) {
 			x = x+1;
 		}
-		
+
 		//store this tile as the starting point for the straighten
 		int startx = x, starty = y;
-		
+
 		//crawl along until an intersection or door is found
 		while(!isIntersection(x, y)){
-			if(x-1 >= 0 && x-1 != oldx && map[x-1][y] == tileType.HALL || map[x-1][y] == tileType.DOOR){
+			if(x-1 >= 0 && x-1 != oldx && map[x-1][y].type == Tile.HALL || map[x-1][y].type == Tile.DOOR){
 				oldx=x;
 				x = x-1;
 			}
-			else if(x+1 < MAP_WIDTH && x+1 != x && map[x+1][y] == tileType.HALL || map[x+1][y] == tileType.DOOR){
+			else if(x+1 < MAP_WIDTH && x+1 != x && map[x+1][y].type == Tile.HALL || map[x+1][y].type == Tile.DOOR){
 				oldx=x;
 				x = x+1;
 			}
-			else if(y-1 > 0 && y-1 != oldy && map[x][y-1] == tileType.HALL ||  map[x][y-1] == tileType.DOOR){
+			else if(y-1 > 0 && y-1 != oldy && map[x][y-1].type == Tile.HALL ||  map[x][y-1].type == Tile.DOOR){
 				oldy = y;
 				y = y-1;
 			}
-			else if(y+1 < MAP_HEIGHT && y+1 != oldy && map[x][y+1] == tileType.HALL ||  map[x][y+1] == tileType.DOOR){
+			else if(y+1 < MAP_HEIGHT && y+1 != oldy && map[x][y+1].type == Tile.HALL ||  map[x][y+1].type == Tile.DOOR){
 				oldy = y;
 				y = y+1;
 			}
 		}
-		
+
 		//attempt to find a straighter line between them
 		straighten(startx, starty, x, y);
-		
+
 		//clear out the dead ends created
 	}
-	
+
 	void straighten(int x, int y, int targx, int targy){
 		if(targx == x && targy == y) return;
-		
+
 		if(targx > x){
 			if(targy > y){ //down and to the right
 				//try horizontal first
-				if(map[x+1][y] != tileType.WALL){
+				if(map[x+1][y].type != Tile.WALL){
 					setHall(x+1,y);
 					straighten(x+1, y, targx, targy);
 				}
 				//if not do vertical first
-				else if(map[x][y+1] != tileType.WALL){
+				else if(map[x][y+1].type != Tile.WALL){
 					setHall(x,y+1);
 					straighten(x,y+1,targx,targy);
 				}
 			}
 			else if(targy <= y){ //up and to the right
-				
+
 			}
 		}
 		else if(targx <= x){
 			if(targy > y){ //down and to the left
-				
+
 			}
 			else if(targy <= y){ //up and to the left
-				
+
 			}
 		}
 	}
-	
+
 	void killDeadEnd(int x, int y){
 		if(!isDeadEnd(x, y)) return;
-		
-		map[x][y] = tileType.HWALL;
+
+		map[x][y].type = Tile.HWALL;
 		killDeadEnd(x-1, y);
 		killDeadEnd(x+1,y);
 		killDeadEnd(x,y-1);
 		killDeadEnd(x,y+1);
-		
+
 	}
-	
+
 	boolean isDeadEnd(int x, int y){
-		if(map[x][y] != tileType.HALL && map[x][y] != tileType.DOOR) return false;
-		
+		if(map[x][y].type != Tile.HALL && map[x][y].type != Tile.DOOR) return false;
+
 		int numAdj = 0;
-		if(map[x-1][y] == tileType.HALL || map[x-1][y] == tileType.ROOM || map[x-1][y] == tileType.DOOR) numAdj++;
-		if(map[x+1][y] == tileType.HALL || map[x+1][y] == tileType.ROOM || map[x+1][y] == tileType.DOOR) numAdj++;
-		if(map[x][y-1] == tileType.HALL || map[x][y-1] == tileType.ROOM || map[x][y-1] == tileType.DOOR) numAdj++;
-		if(map[x][y+1] == tileType.HALL || map[x][y+1] == tileType.ROOM || map[x][y+1] == tileType.DOOR) numAdj++;
+		if(map[x-1][y].type == Tile.HALL || map[x-1][y].type == Tile.ROOM || map[x-1][y].type == Tile.DOOR) numAdj++;
+		if(map[x+1][y].type == Tile.HALL || map[x+1][y].type == Tile.ROOM || map[x+1][y].type == Tile.DOOR) numAdj++;
+		if(map[x][y-1].type == Tile.HALL || map[x][y-1].type == Tile.ROOM || map[x][y-1].type == Tile.DOOR) numAdj++;
+		if(map[x][y+1].type == Tile.HALL || map[x][y+1].type == Tile.ROOM || map[x][y+1].type == Tile.DOOR) numAdj++;
 		if(numAdj > 1) return false;
-		
+
 		return true;
 	}
-	
+
 	boolean isIntersection(int x, int y){
-		if(map[x][y] != tileType.HALL && map[x][y] != tileType.DOOR) return false;
-		if(map[x][y] == tileType.DOOR) return true; //all doors count as intersections
-		
+		if(map[x][y].type != Tile.HALL && map[x][y].type != Tile.DOOR) return false;
+		if(map[x][y].type == Tile.DOOR) return true; //all doors count as intersections
+
 		int numAdj = 0;
-		if(map[x-1][y] == tileType.HALL || map[x-1][y] == tileType.ROOM || map[x-1][y] == tileType.DOOR) numAdj++;
-		if(map[x+1][y] == tileType.HALL || map[x+1][y] == tileType.ROOM || map[x+1][y] == tileType.DOOR) numAdj++;
-		if(map[x][y-1] == tileType.HALL || map[x][y-1] == tileType.ROOM || map[x][y-1] == tileType.DOOR) numAdj++;
-		if(map[x][y+1] == tileType.HALL || map[x][y+1] == tileType.ROOM || map[x][y+1] == tileType.DOOR) numAdj++;
+		if(map[x-1][y].type == Tile.HALL || map[x-1][y].type == Tile.ROOM || map[x-1][y].type == Tile.DOOR) numAdj++;
+		if(map[x+1][y].type == Tile.HALL || map[x+1][y].type == Tile.ROOM || map[x+1][y].type == Tile.DOOR) numAdj++;
+		if(map[x][y-1].type == Tile.HALL || map[x][y-1].type == Tile.ROOM || map[x][y-1].type == Tile.DOOR) numAdj++;
+		if(map[x][y+1].type == Tile.HALL || map[x][y+1].type == Tile.ROOM || map[x][y+1].type == Tile.DOOR) numAdj++;
 		if(numAdj <= 2) return false;
-		
+
 		return true;
 	}
-	
+
 	boolean generateHall(int x, int y){
 		//if the hall is being generated on an occupied tile, end recursion
-		if(map[x][y] != tileType.UNUSED && map[x][y] != tileType.HWALL){
+		if(map[x][y].type != Tile.UNUSED && map[x][y].type != Tile.HWALL){
 			return false;
 		}
 		else {
@@ -344,10 +368,10 @@ public class DungeonGenerator {
 
 			int fromx = x, fromy = y;
 			//find direction the hall came from
-			if(map[x-1][y] == tileType.HALL) fromx = x-1; //came from the west
-			else if(map[x+1][y] == tileType.HALL) fromx = x+1; //came from the east
-			else if(map[x][y-1] == tileType.HALL) fromy = y-1; //came from the north
-			else if(map[x][y+1] == tileType.HALL) fromy = y+1; //came from the south
+			if(map[x-1][y].type == Tile.HALL) fromx = x-1; //came from the west
+			else if(map[x+1][y].type == Tile.HALL) fromx = x+1; //came from the east
+			else if(map[x][y-1].type == Tile.HALL) fromy = y-1; //came from the north
+			else if(map[x][y+1].type == Tile.HALL) fromy = y+1; //came from the south
 
 			//generate a hall traveling in the same direction
 			if(fromx == x-1) {
@@ -398,28 +422,28 @@ public class DungeonGenerator {
 
 		return true;
 	}
-	
+
 	//simpler version that doesn't prioritize travel in the same direction (will probably be ugly)
 	boolean generateHallJagged(int x, int y){
 		if(x < 1 || x >= MAP_WIDTH-1 || y < 1 || y >= MAP_HEIGHT -1){
 			return false;
 		}
-		
+
 		//only generate on new tiles
-		if(map[x][y] != tileType.UNUSED && map[x][y] != tileType.HWALL){
+		if(map[x][y].type != Tile.UNUSED && map[x][y].type != Tile.HWALL){
 			return false;
 		}
-		
+
 		//make sure there's only one adjacent hallway, if any
 		int numAdj = 0;
-		if(map[x-1][y] == tileType.HALL) numAdj++;
-		if(map[x+1][y] == tileType.HALL) numAdj++;
-		if(map[x][y-1] == tileType.HALL) numAdj++;
-		if(map[x][y+1] == tileType.HALL) numAdj++;
+		if(map[x-1][y].type == Tile.HALL) numAdj++;
+		if(map[x+1][y].type == Tile.HALL) numAdj++;
+		if(map[x][y-1].type == Tile.HALL) numAdj++;
+		if(map[x][y+1].type == Tile.HALL) numAdj++;
 		if(numAdj > 1) return false;
-		
+
 		setHall(x, y);
-		
+
 		//generate on every side
 		numAdj = 1;
 		double d = Math.random();
@@ -448,10 +472,10 @@ public class DungeonGenerator {
 			if(generateHallJagged(x,y-1)) numAdj++;
 		}
 		if(numAdj == 1) deadEnds.add(new Room(x,y,1,1)); //this will make finding dead ends easier later
-		
+
 		return true;
 	}
-	
+
 	//sets a point as a hallway, and adds walls to all adjacent and diagonal tiles
 	//returns true if successful, false otherwise
 	boolean setHall(int x, int y){
@@ -459,20 +483,20 @@ public class DungeonGenerator {
 
 		//check which adjacent tiles are hallways
 		boolean up = false, left = false, down = false, right = false;
-		if(map[x-1][y] == tileType.HALL) left = true;
-		if(map[x+1][y] == tileType.HALL) right = true;
-		if(map[x][y-1] == tileType.HALL) up = true;
-		if(map[x][y+1] == tileType.HALL) down = true;
+		if(map[x-1][y].type == Tile.HALL) left = true;
+		if(map[x+1][y].type == Tile.HALL) right = true;
+		if(map[x][y-1].type == Tile.HALL) up = true;
+		if(map[x][y+1].type == Tile.HALL) down = true;
 
 		//if the hall is adjacent to more than one hall, reject
 		if(up && left || up && right || down && left || down && right ) return false;
 
-		if(map[x][y] == tileType.UNUSED || map[x][y] == tileType.HWALL){ //don't overwrite wall or room tiles; that would be bad
-			map[x][y] = tileType.HALL;
+		if(map[x][y].type == Tile.UNUSED || map[x][y].type == Tile.HWALL){ //don't overwrite wall or room tiles; that would be bad
+			map[x][y].type = Tile.HALL;
 			for(int i = x-1; i <= x+1; i++){
 				for(int j = y-1; j <= y+1; j++){
-					if(map[i][j] == tileType.UNUSED)
-						map[i][j] = tileType.HWALL;
+					if(map[i][j].type == Tile.UNUSED)
+						map[i][j].type = Tile.HWALL;
 				}
 			}
 		}
@@ -492,7 +516,7 @@ public class DungeonGenerator {
 		if(!allowRoomOverlap){
 			for(int j = y; j < y+h; j++){
 				for(int i = x; i < x+w; i++){
-					if(map[i][j] != tileType.UNUSED) return false;
+					if(map[i][j].type != Tile.UNUSED) return false;
 				}
 			}
 		}
@@ -501,12 +525,12 @@ public class DungeonGenerator {
 
 		for(int j = y-1; j <= y+h; j++){
 			for(int i = x-1; i <= x+w; i++){
-				if(map[i][j] == tileType.UNUSED || map[i][j] == tileType.WALL){
+				if(map[i][j].type == Tile.UNUSED || map[i][j].type == Tile.WALL){
 					if(!(i==x-1 || i == x+w || j == y-1 || j == y+h)){
-						map[i][j] = tileType.ROOM;
+						map[i][j].type = Tile.ROOM;
 					}
 					else {
-						map[i][j] = tileType.WALL;
+						map[i][j].type = Tile.WALL;
 					}
 				}
 			}
@@ -520,28 +544,8 @@ public class DungeonGenerator {
 	public void debugPrintMap(){
 		for(int j = 0; j < MAP_HEIGHT; j++){
 			for(int i = 0; i < MAP_WIDTH; i++){
-				switch(map[i][j]){
-				case UNUSED:
-					System.out.print("███");
-					break;
-				case WALL:
-					System.out.print("███");
-					break;
-				case HWALL:
-					System.out.print("███");
-					break;
-				case HALL:
-					System.out.print("   ");
-					break;
-				case ROOM:
-					System.out.print("   ");
-					break;
-				case DOOR:
-					System.out.print("   ");
-					break;
-				}
+				System.out.print(map[i][j].toString());
 			}
-
 			System.out.print("\n"); //end the line
 		}
 	}
